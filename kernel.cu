@@ -43,6 +43,7 @@ void histogram_gpu_private(unsigned char* image_d, unsigned int* bins_d, unsigne
 __global__ void histogram_private_coarse_kernel(unsigned char* image, unsigned int* bins, unsigned int width, unsigned int height) {
 
     __shared__ unsigned int private_bins[256]; 
+	unsigned int coarseningFactor = 64;
 
 
     for (int i = 0; i < 256; ++i) {
@@ -51,11 +52,11 @@ __global__ void histogram_private_coarse_kernel(unsigned char* image, unsigned i
 
     __syncthreads();
 
-    unsigned int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    unsigned int tid = (blockIdx.x * blockDim.x * coarseningFactor) + threadIdx.x;
     while (tid < width * height) {
         unsigned char b = image[tid];
         atomicAdd(&private_bins[b], 1);
-        tid += blockDim.x * gridDim.x; 
+        tid += blockDim.x;
     }
 
     __syncthreads();
@@ -68,7 +69,8 @@ __global__ void histogram_private_coarse_kernel(unsigned char* image, unsigned i
 void histogram_gpu_private_coarse(unsigned char* image_d, unsigned int* bins_d, unsigned int width, unsigned int height) {
 
     unsigned int numThreadsPerBlock = 1024;
-    unsigned int numBlocks = (width * height + numThreadsPerBlock - 1) / numThreadsPerBlock;
+    unsigned int coarseningFactor = 64;
+    unsigned int numBlocks = (width * height + (numThreadsPerBlock * coarseningFactor) - 1) / (numThreadsPerBlock * coarseningFactor);
     histogram_private_coarse_kernel<<<numBlocks, numThreadsPerBlock>>>(image_d, bins_d, width, height);
 
 }
